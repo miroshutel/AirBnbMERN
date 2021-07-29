@@ -1,3 +1,6 @@
+import mongodb from "mongodb";
+const ObjectID = mongodb.ObjectId;
+
 let airbnb;
 export default class AirbnbModel {
     static async injectDB(conn) {
@@ -10,6 +13,7 @@ export default class AirbnbModel {
             console.error(`unable to connect to db:${e}`);
         }
     }
+
     static async getAirBnb({
         filters = null,
         page = 0,
@@ -64,4 +68,54 @@ export default class AirbnbModel {
             };
         }
     }
+    static async getBedTypes() {
+        let bedTypes = [];
+        try {
+            bedTypes = await airbnb.distinct("bed_type");
+            return bedTypes;
+        } catch (e) {
+            console.error(`Unable to get bedtypes ${e}`);
+        }
+    }
+    static async getAirBnbById(id) {
+        try {
+            const pipeline = [{
+                    $match: {
+                        _id: new ObjectID(id)
+                    }
+                },
+                {
+                    $lookup: {
+                        from: "reviews",
+                        let: {
+                            id: "$_id"
+                        }
+                    },
+                    pipeline: [{
+                        $match: {
+                            $expr: {
+                                $eq: ["$_id", "$$id"]
+                            }
+                        },
+                        $sort: {
+                            date: -1
+                        }
+                    }],
+                    as: "reviews"
+                }, ,
+                {
+                    $addFields: {
+                        reviews: "$reviews",
+                    }
+                },
+            ]
+            return await airbnb.aggregate(pipeline).next();
+        } catch (e) {
+            console.error(`Something went wrong in getAirBNB Reviews ${e}`);
+        }
+
+
+    }
+
+
 }
